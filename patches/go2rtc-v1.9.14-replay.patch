@@ -1,0 +1,44 @@
+--- a/pkg/rtsp/conn.go
++++ b/pkg/rtsp/conn.go
+@@ -23,6 +23,7 @@
+ 
+ 	// public
+ 
++	Scale string // Recorded playback speed requested through the RTSP Scale header.
+ 	Backchannel bool
+ 	Media       string
+ 	OnClose     func() error
+--- a/pkg/rtsp/client.go
++++ b/pkg/rtsp/client.go
+@@ -385,6 +385,7 @@
+ 
+ func (c *Conn) Play() (err error) {
+ 	req := &tcp.Request{Method: MethodPlay, URL: c.URL}
++	if c.Scale != "" { req.Header = make(map[string][]string); req.Header.Set("Scale", c.Scale) }
+ 	return c.WriteRequest(req)
+ }
+ 
+--- a/internal/rtsp/rtsp.go
++++ b/internal/rtsp/rtsp.go
+@@ -105,6 +105,7 @@
+ 		conn.Media = query.Get("media")
+ 		conn.Timeout = core.Atoi(query.Get("timeout"))
+ 		conn.Transport = query.Get("transport")
++		conn.Scale = query.Get("scale")
+ 	}
+ 
+ 	if log.Trace().Enabled() {
+--- a/pkg/mp4/muxer.go
++++ b/pkg/mp4/muxer.go
+@@ -150,7 +150,10 @@
+ 	}
+ 
+ 	// minumum duration important for MSE in Apple Safari
+-	if duration == 0 || duration > codec.ClockRate {
++	// Recorded fast playback can contain keyframes several seconds apart.
++	maxDuration := codec.ClockRate
++	if codec.Name == core.CodecH264 || codec.Name == core.CodecH265 { maxDuration *= 60 }
++	if duration == 0 || duration > maxDuration {
+ 		duration = codec.ClockRate/1000 + 1
+ 		m.pts[trackID] += duration
+ 	}

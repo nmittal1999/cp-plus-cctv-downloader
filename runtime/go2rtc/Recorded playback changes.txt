@@ -1,0 +1,22 @@
+This app uses a build of go2rtc v1.9.14 with a small recorded-playback extension:
+- Conn.Scale in pkg/rtsp/conn.go
+- Optional scale fragment parameter in internal/rtsp/rtsp.go
+- Optional Scale header in the RTSP PLAY request in pkg/rtsp/client.go
+
+Normal 1x playback sends no Scale header, as in upstream go2rtc.
+The app supports 0.5x, 1x, 2x, 4x and 8x. The recorder must honor RTSP Scale.
+No video transcoding is added.
+
+The bundled browser player fixes playbackRate to the selected rate instead
+of upstream live-stream latency catch-up. It reports the video position to
+our UI so jump controls can reopen the recorder at the requested timestamp.
+
+The build script produces go2rtc-speed.exe from upstream v1.9.14 and our patch.
+It is covered by the MIT license in LICENSE.txt.
+
+Timing fix: pkg/mp4/muxer.go preserves video frame gaps up to 60 seconds,
+so keyframes from fast recorded replay retain the recorded timeline.
+Zero timestamps and invalid large jumps retain the original protection.
+Browser input buffer grows as needed instead of failing at 2 MiB.
+Startup buffering has a one-second fallback once a decoded frame exists.
+2x browser playback confirmed by the user after the timing fix.
