@@ -32,7 +32,9 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 base='http://127.0.0.1:8799'
 def get(path):return opener.open(base+path)
-state=json.load(get('/api/state'))
+response=get('/api/state')
+assert "img-src 'self' data: blob:" in response.headers['Content-Security-Policy']
+state=json.load(response)
 assert state['cameras']==[] and not state['connected']
 def post(path,payload,token=state['csrf']):
     return opener.open(urllib.request.Request(base+path,json.dumps(payload).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':token,'Origin':base}))
@@ -67,6 +69,11 @@ with TemporaryDirectory() as tmp:
     (w.CLIPS/'unfinished.working.mp4').write_bytes(b'partial')
     assert [c['name'] for c in w.clip_list()]==['check.mp4']
 assert get('/').status==200
+for asset in ('/app.js','/multi.js','/app.css'):
+    response=get(asset)
+    assert 'charset=utf-8' in response.headers['Content-Type']
+    text=response.read().decode('utf-8')
+    assert not any(c in text for c in ('\u00c3','\u00c2','\ufffd','\u00e2'))
 json.load(post('/api/disconnect',{}))
 assert not json.load(get('/api/state'))['connected']
 server.shutdown()
